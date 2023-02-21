@@ -11,71 +11,36 @@ import torch
 from torch import nn
 from tqdm.auto import tqdm
 from torchvision import transforms
-# from torchvision.datasets import MNIST # Training dataset
 from torchvision.utils import make_grid
-from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 torch.manual_seed(0) # Set for testing purposes, please do not change!
 
-# def show_tensor_images(image_tensor, num_images=25, size=(1, 28, 28)):
-#     '''
-#     Function for visualizing images: Given a tensor of images, number of images, and
-#     size per image, plots and prints the images in a uniform grid.
-#     '''
-#     image_unflat = image_tensor.detach().cpu().view(-1, *size)
-#     image_grid = make_grid(image_unflat[:num_images], nrow=5)
-#     plt.imshow(image_grid.permute(1, 2, 0).squeeze())
-#     plt.show()
+# Set your parameters
+criterion = nn.BCEWithLogitsLoss()
+n_epochs = 200
+z_dim = 2
+display_step = 500
+batch_size = 32
+lr = 0.00001
+device = 'cuda'
 
-# Load the Drive helper and mount
-from google.colab import drive
-drive.mount('/content/drive')
-
-!ls /content/drive/MyDrive/hackathon
-
-import pandas as pd
 df = pd.read_csv('/content/drive/MyDrive/hackathon/Monthly_Average_1950_2009_reservoir.csv').values
 
-df
-
-df.shape
-
-import torch
-import numpy as np
-from torch.utils.data import TensorDataset, DataLoader
-
-# my_x = [np.array([[1.0,2],[3,4]]),np.array([[5.,6],[7,8]])] # a list of numpy arrays
-# my_y = [np.array([4.]), np.array([2.])] # another list of numpy arrays (targets)
+print(f"Dataframe shape = {df.shape}")
 
 tensor_x = torch.Tensor(df) # transform to torch tensor
-# tensor_y = torch.Tensor(my_y)
-batch_size = 32
 dataset = TensorDataset(tensor_x) # create your datset
 dataloader = DataLoader(dataset,
     batch_size=batch_size,
     shuffle=True) # create your dataloader
 
-dataloader
-
 for real in tqdm(dataloader):
-    # cur_batch_size = len(real)
     print(real[0].shape, len(real[0]))
 
-
-
-# np.array(dataloader.dataset).shape
-
-# dataloader = DataLoader(
-#     MNIST('.', download=True, transform=transforms.ToTensor()),
-#     batch_size=batch_size,
-#     shuffle=True)
-
-# for real, _ in tqdm(dataloader):
-#     cur_batch_size = len(real)
-#     print(real.shape)
-
-# UNQ_C1 (UNIQUE CELL IDENTIFIER, DO NOT EDIT)
-# GRADED FUNCTION: get_generator_block
 def get_generator_block(input_dim, output_dim):
     '''
     Function for returning a block of the generator's neural network
@@ -210,14 +175,6 @@ class Discriminator(nn.Module):
         '''
         return self.disc
 
-# Set your parameters
-criterion = nn.BCEWithLogitsLoss()
-n_epochs = 200
-z_dim = 2
-display_step = 500
-batch_size = 32
-lr = 0.00001
-device = 'cuda'
 #Load MNIST dataset as tensors
 # dataloader = DataLoader(
 #     MNIST('.', download=True, transform=transforms.ToTensor()),
@@ -375,7 +332,6 @@ for epoch in range(n_epochs):
             mean_discriminator_loss = 0
         cur_step += 1
 
-import seaborn as sns
 
 fake_noise = get_noise(720, z_dim, device=device)
 fake = gen(fake_noise).cpu().detach().numpy()
@@ -391,7 +347,13 @@ for i in range(1,7):
     dict_ = {'data':fake[:,i-1], 'type':'fake', 'station': str(i)}
     df = df.append(pd.DataFrame(dict_))
 
+fig = plt.figure()
 sns.boxplot(data=df, x="station", y="data", hue="type")
+fig.savefig("boxplot.png")
+fig.close()
 
+fig = plt.figure()
 sns.violinplot(data=df, x="station", y="data", hue="type")
+fig.savefig("violinplot.png")
+fig.close()
 
