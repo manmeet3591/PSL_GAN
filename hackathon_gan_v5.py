@@ -93,6 +93,7 @@ def get_generator_block(input_dim, output_dim):
         # https://pytorch.org/docs/stable/nn.html.
         #### START CODE HERE ####
         nn.Linear(input_dim, output_dim),
+        nn.Dropout(p=0.25),
         nn.BatchNorm1d(output_dim),
         nn.ReLU(inplace=True),
         #### END CODE HERE ####
