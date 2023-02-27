@@ -34,7 +34,7 @@ torch.manual_seed(0) # Set for testing purposes, please do not change!
 #!ls /content/drive/MyDrive/hackathon
 
 import pandas as pd
-df = pd.read_csv('/content/drive/MyDrive/hackathon/Monthly_Average_1950_2009_reservoir.csv').values
+df = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
 
 df
 
@@ -380,7 +380,7 @@ import seaborn as sns
 
 fake_noise = get_noise(720, z_dim, device=device)
 fake = gen(fake_noise).cpu().detach().numpy()
-real = pd.read_csv('/content/drive/MyDrive/hackathon/Monthly_Average_1950_2009_reservoir.csv').values
+real = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
 
 dict_ = {'data':real[:,0], 'type':'real', 'station': '1'}
 df = pd.DataFrame(dict_)
@@ -391,8 +391,8 @@ for i in range(2,7):
 for i in range(1,7):
     dict_ = {'data':fake[:,i-1], 'type':'fake', 'station': str(i)}
     df = df.append(pd.DataFrame(dict_))
-
+import matplotlib.pyplot as plt 
 sns.boxplot(data=df, x="station", y="data", hue="type")
-
+plt.savefig('boxplot.png', dpi=500)
 sns.violinplot(data=df, x="station", y="data", hue="type")
-
+plt.savefig('violinplot.png', dpi=500)
