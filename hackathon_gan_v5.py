@@ -28,10 +28,10 @@ torch.manual_seed(0) # Set for testing purposes, please do not change!
 #     plt.show()
 
 # Load the Drive helper and mount
-from google.colab import drive
-drive.mount('/content/drive')
+#from google.colab import drive
+#drive.mount('/content/drive')
 
-!ls /content/drive/MyDrive/hackathon
+#!ls /content/drive/MyDrive/hackathon
 
 import pandas as pd
 df = pd.read_csv('/content/drive/MyDrive/hackathon/Monthly_Average_1950_2009_reservoir.csv').values
