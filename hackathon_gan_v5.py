@@ -380,6 +380,9 @@ import seaborn as sns
 
 fake_noise = get_noise(720, z_dim, device=device)
 fake = gen(fake_noise).cpu().detach().numpy()
+
+import numpy as np
+np.savetxt('fake.txt', delimiter=',')
 real = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
 
 dict_ = {'data':real[:,0], 'type':'real', 'station': '1'}
