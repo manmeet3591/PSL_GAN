@@ -15,3 +15,5 @@ If your local cluster doesn’t have the latest Nsight version- here’s where y
 Nsight Systems profiler (version 2023.1) for Windows or Linux: Nsight Systems 2023.1
 
 Nsight Compute latest is 2022.4.1, which can be found here: https://developer.nvidia.com/gameworksdownload#?dn=nsight-compute-2022-4-1
+
+Profiling guide: https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#metrics-hw-model
