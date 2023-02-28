@@ -18,9 +18,6 @@ Nsight Compute latest is 2022.4.1, which can be found here: https://developer.nv
 
 Profiling guide: https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#metrics-hw-model
 
-Videos: 
-
-Nsight AI Tutorial | NOAA/NCAR Hackathon | NVIDIA https://www.youtube.com/watch?v=u8FcM1j5u_0
 
 NVTX: https://docs.nvidia.com/nvtx/overview/index.html
 
@@ -29,3 +26,11 @@ NVIDIA Nsight Systems user guide: https://docs.nvidia.com/nsight-systems/UserGui
 Apptainer: https://apptainer.org/docs/user/1.0/bind_paths_and_mounts.html
 
 apptainer run /usr/local/containers/lolcow.sif
+
+Videos: 
+
+Nsight AI Tutorial | NOAA/NCAR Hackathon | NVIDIA https://www.youtube.com/watch?v=u8FcM1j5u_0
+
+Nsight Compute + Nsight System Q&A + Demo | NOAA/NCAR Hackathon NVIDIA: https://www.youtube.com/watch?v=jBc4qNzXW-0
+
+Tensorboard Tutorial NOAA/NCAR Hackathon NVIDIA: https://www.youtube.com/watch?v=9dMWBAg3Yd8
