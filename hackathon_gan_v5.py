@@ -310,16 +310,58 @@ for epoch in range(n_epochs):
             mean_discriminator_loss = 0
         cur_step += 1
 
+# Evaluate the model
+fake_noise = get_noise(720, z_dim, device=device)
+fake = gen(fake_noise).cpu().detach().numpy()
+np.savetxt('fake.txt', delimiter=',')
+
+#real = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
+real = df.values
+
+# mean error (%)
+mean_error = (fake.mean(axis=0) - real.mean(axis=0)) / real.mean(axis=0) * 100
+
+# std error (%)
+std_error = (fake.std(axis=0) - real.std(axis=0)) / real.std(axis=0) * 100
+
+# Combine
+stats_df = pd.DataFrame([mean_error, std_error],
+                        columns=df.columns,
+                        index=['Mean error', 'Std error'])
+
+# Mean absolute percent error
+mape_df = stats_df.abs().mean(axis=1)
+
+with pd.option_context('display.float_format', '{:.2f}%'.format, 'display.expand_frame_repr', False):
+    print('---Individual watersheds---')
+    print(stats_df)
+    print('---Summary (MAPE)---')
+    print(mape_df)
+
+# Calculate empirical CDFs
+bins = np.linspace(0, 15, 31)   # Maximum 15 mm for now
+binsize = bins[1:] - bins[:-1]
+
+real_hist = np.apply_along_axis(lambda a: np.histogram(a, bins=bins, density=True)[0], 0, real)
+real_ecdf = np.cumsum(real_hist, axis=0) * binsize[:, np.newaxis]
+
+fake_hist = np.apply_along_axis(lambda a: np.histogram(a, bins=bins, density=True)[0], 0, fake)
+fake_ecdf = np.cumsum(fake_hist, axis=0) * binsize[:, np.newaxis]
+
+# Continuous ranked probability score (CRPS)
+crps = np.sum(np.abs((real_ecdf - fake_ecdf) * binsize[:, np.newaxis]), axis=0)
+crps_df = pd.DataFrame([crps], columns=df.columns, index=['CRPS'])
+
+with pd.option_context('display.float_format', '{:.2f}'.format, 'display.expand_frame_repr', False):
+    print('---Individual watersheds---')
+    print(crps_df)
+    print('---Mean CRPS---')
+    print(f'{crps.mean():.2f}')
+
+
 # Make plots
 import seaborn as sns
 import matplotlib.pyplot as plt 
-
-fake_noise = get_noise(720, z_dim, device=device)
-fake = gen(fake_noise).cpu().detach().numpy()
-
-np.savetxt('fake.txt', delimiter=',')
-#real = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
-real = df.values
 
 dict_ = {'data':real[:,0], 'type':'real', 'station': '1'}
 df = pd.DataFrame(dict_)
