@@ -22,3 +22,10 @@ Videos:
 
 Nsight AI Tutorial | NOAA/NCAR Hackathon | NVIDIA https://www.youtube.com/watch?v=u8FcM1j5u_0
 
+NVTX: https://docs.nvidia.com/nvtx/overview/index.html
+
+NVIDIA Nsight Systems user guide: https://docs.nvidia.com/nsight-systems/UserGuide/index.html
+
+Apptainer: https://apptainer.org/docs/user/1.0/bind_paths_and_mounts.html
+
+apptainer run /usr/local/containers/lolcow.sif
