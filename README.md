@@ -6,4 +6,6 @@ srun -n 1 --gres=gpu:1 -p gpu --container-mounts="/home/psl-gan/:/psl-gan" --con
 Running curiosity cluster: https://axis-raplabhackathon.axisportal.io/apps
 
 IMAGE=registry.gitlab.com/cponder/containers/ubuntu-pgi-openmpi/selene:latest
+
+
 srun --container-image $IMAGE --container-mounts $PWD --container-workdir $PWD -t 00:30:00 --pty bash -i -l
