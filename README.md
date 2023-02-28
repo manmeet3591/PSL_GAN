@@ -9,3 +9,9 @@ IMAGE=registry.gitlab.com/cponder/containers/ubuntu-pgi-openmpi/selene:latest
 
 
 srun --container-image $IMAGE --container-mounts $PWD --container-workdir $PWD -t 00:30:00 --pty bash -i -l
+
+If your local cluster doesn’t have the latest Nsight version- here’s where you can download them:
+
+Nsight Systems profiler (version 2023.1) for Windows or Linux: Nsight Systems 2023.1
+
+Nsight Compute latest is 2022.4.1, which can be found here: https://developer.nvidia.com/gameworksdownload#?dn=nsight-compute-2022-4-1
