@@ -7,25 +7,13 @@ Original file is located at
     https://colab.research.google.com/drive/1nMO83OdFSQi7R_QZK5qIdzKcbyaTQDtd
 """
 
+import numpy as np
+import pandas as pd
 import torch
 from torch import nn
+from torch.utils.data import TensorDataset, DataLoader
 from tqdm.auto import tqdm
-from torchvision import transforms
-# from torchvision.datasets import MNIST # Training dataset
-from torchvision.utils import make_grid
-from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
 torch.manual_seed(0) # Set for testing purposes, please do not change!
-
-# def show_tensor_images(image_tensor, num_images=25, size=(1, 28, 28)):
-#     '''
-#     Function for visualizing images: Given a tensor of images, number of images, and
-#     size per image, plots and prints the images in a uniform grid.
-#     '''
-#     image_unflat = image_tensor.detach().cpu().view(-1, *size)
-#     image_grid = make_grid(image_unflat[:num_images], nrow=5)
-#     plt.imshow(image_grid.permute(1, 2, 0).squeeze())
-#     plt.show()
 
 # Load the Drive helper and mount
 #from google.colab import drive
@@ -33,22 +21,9 @@ torch.manual_seed(0) # Set for testing purposes, please do not change!
 
 #!ls /content/drive/MyDrive/hackathon
 
-import pandas as pd
-df = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
+df = pd.read_csv('data/Monthly_Average_1950_2009_reservoir.csv')
 
-df
-
-df.shape
-
-import torch
-import numpy as np
-from torch.utils.data import TensorDataset, DataLoader
-
-# my_x = [np.array([[1.0,2],[3,4]]),np.array([[5.,6],[7,8]])] # a list of numpy arrays
-# my_y = [np.array([4.]), np.array([2.])] # another list of numpy arrays (targets)
-
-tensor_x = torch.Tensor(df) # transform to torch tensor
-# tensor_y = torch.Tensor(my_y)
+tensor_x = torch.Tensor(df.values) # transform to torch tensor
 batch_size = 32
 dataset = TensorDataset(tensor_x) # create your datset
 dataloader = DataLoader(dataset,
@@ -61,20 +36,6 @@ for real in tqdm(dataloader):
     # cur_batch_size = len(real)
     print(real[0].shape, len(real[0]))
 
-
-
-# np.array(dataloader.dataset).shape
-
-# dataloader = DataLoader(
-#     MNIST('.', download=True, transform=transforms.ToTensor()),
-#     batch_size=batch_size,
-#     shuffle=True)
-
-# for real, _ in tqdm(dataloader):
-#     cur_batch_size = len(real)
-#     print(real.shape)
-
-# UNQ_C1 (UNIQUE CELL IDENTIFIER, DO NOT EDIT)
 # GRADED FUNCTION: get_generator_block
 def get_generator_block(input_dim, output_dim):
     '''
@@ -88,15 +49,10 @@ def get_generator_block(input_dim, output_dim):
           followed by a batch normalization and then a relu activation
     '''
     return nn.Sequential(
-        # Hint: Replace all of the "None" with the appropriate dimensions.
-        # The documentation may be useful if you're less familiar with PyTorch:
-        # https://pytorch.org/docs/stable/nn.html.
-        #### START CODE HERE ####
         nn.Linear(input_dim, output_dim),
         nn.Dropout(p=0.25),
         nn.BatchNorm1d(output_dim),
         nn.ReLU(inplace=True),
-        #### END CODE HERE ####
     )
 
 class Generator(nn.Module):
@@ -116,11 +72,8 @@ class Generator(nn.Module):
             get_generator_block(hidden_dim, hidden_dim * 2),
             get_generator_block(hidden_dim * 2, hidden_dim * 4),
             get_generator_block(hidden_dim * 4, hidden_dim * 8),
-            # There is a dropdown with hints if you need them! 
-            #### START CODE HERE ####
             nn.Linear(hidden_dim * 8, im_dim),
             #nn.Sigmoid()
-            #### END CODE HERE ####
         )
     def forward(self, noise):
         '''
@@ -150,9 +103,7 @@ def get_noise(n_samples, z_dim, device='cpu'):
     '''
     # NOTE: To use this on GPU with device='cuda', make sure to pass the device 
     # argument to the function you use to generate the noise.
-    #### START CODE HERE ####
     return torch.randn(n_samples,z_dim,device=device)
-    #### END CODE HERE ####
 
 def get_discriminator_block(input_dim, output_dim):
     '''
@@ -167,10 +118,8 @@ def get_discriminator_block(input_dim, output_dim):
           (https://pytorch.org/docs/master/generated/torch.nn.LeakyReLU.html)
     '''
     return nn.Sequential(
-        #### START CODE HERE ####
          nn.Linear(input_dim, output_dim), #Layer 1
          nn.LeakyReLU(0.2, inplace=True)
-        #### END CODE HERE ####
     )
 
 class Discriminator(nn.Module):
@@ -187,11 +136,7 @@ class Discriminator(nn.Module):
             get_discriminator_block(im_dim, hidden_dim * 4),
             get_discriminator_block(hidden_dim * 4, hidden_dim * 2),
             get_discriminator_block(hidden_dim * 2, hidden_dim),
-            # Hint: You want to transform the final output into a single value,
-            #       so add one more linear map.
-            #### START CODE HERE ####
             nn.Linear(hidden_dim, 1)
-            #### END CODE HERE ####
         )
 
     def forward(self, image):
@@ -211,24 +156,6 @@ class Discriminator(nn.Module):
         '''
         return self.disc
 
-# Set your parameters
-criterion = nn.BCEWithLogitsLoss()
-n_epochs = 200
-z_dim = 2
-display_step = 500
-batch_size = 32
-lr = 0.00001
-device = 'cuda'
-#Load MNIST dataset as tensors
-# dataloader = DataLoader(
-#     MNIST('.', download=True, transform=transforms.ToTensor()),
-#     batch_size=batch_size,
-#     shuffle=True)
-
-gen = Generator(z_dim).to(device)
-gen_opt = torch.optim.Adam(gen.parameters(), lr=lr)
-disc = Discriminator().to(device) 
-disc_opt = torch.optim.Adam(disc.parameters(), lr=lr)
 
 def get_disc_loss(gen, disc, criterion, real, num_images, z_dim, device):
     '''
@@ -259,7 +186,6 @@ def get_disc_loss(gen, disc, criterion, real, num_images, z_dim, device):
     #       4) Calculate the discriminator's loss by averaging the real and fake loss
     #            and set it to disc_loss.
     #     *Important*: You should NOT write your own loss function here - use criterion(pred, true)!
-    #### START CODE HERE ####
     fake_noise = get_noise(num_images, z_dim, device=device)
     fake = gen(fake_noise)
     disc_fake_pred = disc(fake.detach())
@@ -267,7 +193,6 @@ def get_disc_loss(gen, disc, criterion, real, num_images, z_dim, device):
     disc_real_pred = disc(real)
     disc_real_loss = criterion(disc_real_pred, torch.ones_like(disc_real_pred))
     disc_loss = (disc_fake_loss + disc_real_loss) / 2
-    #### END CODE HERE ####
     return disc_loss
 
 def get_gen_loss(gen, disc, criterion, num_images, z_dim, device):
@@ -294,13 +219,24 @@ def get_gen_loss(gen, disc, criterion, num_images, z_dim, device):
     #          the discriminator to think that its fake images are real
     #     *Important*: You should NOT write your own loss function here - use criterion(pred, true)!
 
-    #### START CODE HERE ####
     fake_noise = get_noise(num_images, z_dim, device=device)
     fake = gen(fake_noise)
     disc_fake_pred = disc(fake)
     gen_loss = criterion(disc_fake_pred, torch.ones_like(disc_fake_pred))
-    #### END CODE HERE ####
     return gen_loss
+
+# Set your parameters
+criterion = nn.BCEWithLogitsLoss()
+n_epochs = 200
+z_dim = 2
+display_step = 500
+lr = 0.00001
+device = 'cuda'
+
+gen = Generator(z_dim).to(device)
+gen_opt = torch.optim.Adam(gen.parameters(), lr=lr)
+disc = Discriminator().to(device) 
+disc_opt = torch.optim.Adam(disc.parameters(), lr=lr)
 
 cur_step = 0
 mean_generator_loss = 0
@@ -341,12 +277,10 @@ for epoch in range(n_epochs):
         #       1) Zero out the gradients.
         #       2) Calculate the generator loss, assigning it to gen_loss.
         #       3) Backprop through the generator: update the gradients and optimizer.
-        #### START CODE HERE ####
         gen_opt.zero_grad()
         gen_loss = get_gen_loss(gen, disc, criterion, cur_batch_size, z_dim, device)
         gen_loss.backward()
         gen_opt.step()
-        #### END CODE HERE ####
 
         # For testing purposes, to check that your code changes the generator weights
         if test_generator:
@@ -376,14 +310,16 @@ for epoch in range(n_epochs):
             mean_discriminator_loss = 0
         cur_step += 1
 
+# Make plots
 import seaborn as sns
+import matplotlib.pyplot as plt 
 
 fake_noise = get_noise(720, z_dim, device=device)
 fake = gen(fake_noise).cpu().detach().numpy()
 
-import numpy as np
 np.savetxt('fake.txt', delimiter=',')
-real = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
+#real = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
+real = df.values
 
 dict_ = {'data':real[:,0], 'type':'real', 'station': '1'}
 df = pd.DataFrame(dict_)
@@ -394,7 +330,7 @@ for i in range(2,7):
 for i in range(1,7):
     dict_ = {'data':fake[:,i-1], 'type':'fake', 'station': str(i)}
     df = df.append(pd.DataFrame(dict_))
-import matplotlib.pyplot as plt 
+
 sns.boxplot(data=df, x="station", y="data", hue="type")
 plt.savefig('boxplot.png', dpi=500)
 sns.violinplot(data=df, x="station", y="data", hue="type")
