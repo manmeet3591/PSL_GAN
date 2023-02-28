@@ -17,3 +17,8 @@ Nsight Systems profiler (version 2023.1) for Windows or Linux: Nsight Systems 20
 Nsight Compute latest is 2022.4.1, which can be found here: https://developer.nvidia.com/gameworksdownload#?dn=nsight-compute-2022-4-1
 
 Profiling guide: https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#metrics-hw-model
+
+Videos: 
+
+Nsight AI Tutorial | NOAA/NCAR Hackathon | NVIDIA https://www.youtube.com/watch?v=u8FcM1j5u_0
+
