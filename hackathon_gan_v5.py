@@ -30,10 +30,6 @@ dataloader = DataLoader(dataset,
     batch_size=batch_size,
     shuffle=True) # create your dataloader
 
-for real in tqdm(dataloader):
-    # cur_batch_size = len(real)
-    print(real[0].shape, len(real[0]))
-
 # GRADED FUNCTION: get_generator_block
 def get_generator_block(input_dim, output_dim):
     '''
