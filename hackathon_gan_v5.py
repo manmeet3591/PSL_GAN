@@ -30,8 +30,6 @@ dataloader = DataLoader(dataset,
     batch_size=batch_size,
     shuffle=True) # create your dataloader
 
-dataloader
-
 for real in tqdm(dataloader):
     # cur_batch_size = len(real)
     print(real[0].shape, len(real[0]))
@@ -313,7 +311,7 @@ for epoch in range(n_epochs):
 # Evaluate the model
 fake_noise = get_noise(720, z_dim, device=device)
 fake = gen(fake_noise).cpu().detach().numpy()
-np.savetxt('fake.txt', delimiter=',')
+np.savetxt('fake.txt', fake, delimiter=',')
 
 #real = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
 real = df.values
