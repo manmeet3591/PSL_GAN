@@ -252,17 +252,46 @@ def update_generator(fake, disc, criterion, gen_opt):
     gen_opt.step()
     return gen_loss
 
-def train_step(real_, cur_batch_size, z_dim, device, gen, disc, criterion, gen_opt, disc_opt):
-    disc_opt.zero_grad(set_to_none=True)
-    gen_opt.zero_grad(set_to_none=True)
+class Trainer():
+    def __init__(self):
+        self.g = None
+        self.disc_loss = None
+        self.gen_loss = None
+        self.real = None
 
-    fake_noise = get_noise(cur_batch_size, z_dim, device=device)
-    fake = gen(fake_noise)
+    def train_step(self, real_, cur_batch_size, z_dim, device, gen, disc, criterion, gen_opt, disc_opt, stream, capture_graph):
+        
+        if not capture_graph:
+            with torch.cuda.stream(stream):
+                disc_opt.zero_grad(set_to_none=True)
+                gen_opt.zero_grad(set_to_none=True)
 
-    disc_loss = update_discriminator(fake, disc, criterion, real_, disc_opt)
-    gen_loss = update_generator(fake, disc, criterion, gen_opt)
+                fake_noise = get_noise(cur_batch_size, z_dim, device=device)
+                fake = gen(fake_noise)
 
-    return disc_loss, gen_loss
+                self.disc_loss = update_discriminator(fake, disc, criterion, real_, disc_opt)
+                self.gen_loss = update_generator(fake, disc, criterion, gen_opt)
+
+            return self.disc_loss, self.gen_loss
+        else:
+            self.real = torch.zeros_like(real_)
+            self.real.copy_(real_)
+            self.g = torch.cuda.CUDAGraph()
+            disc_opt.zero_grad(set_to_none=True)
+            gen_opt.zero_grad(set_to_none=True)
+            # capture
+            with torch.cuda.graph(self.g):
+                fake_noise = get_noise(cur_batch_size, z_dim, device=device)
+                fake = gen(fake_noise)
+
+                self.disc_loss = update_discriminator(fake, disc, criterion, self.real, disc_opt)
+                self.gen_loss = update_generator(fake, disc, criterion, gen_opt)
+
+    def replay(self, real_):
+        self.real.copy_(real_)
+        self.g.replay()
+        return self.disc_loss, self.gen_loss
+
     
 if __name__ == "__main__":
     # Get command line arguments
@@ -285,8 +314,8 @@ if __name__ == "__main__":
     
     gen = Generator(z_dim=z_dim, hidden_dim=args.gen_hidden_dim).to(device)
     disc = Discriminator(hidden_dim=args.disc_hidden_dim).to(device) 
-    gen_opt = torch.optim.Adam(gen.parameters(), lr=lr)
-    disc_opt = torch.optim.Adam(disc.parameters(), lr=lr)
+    gen_opt = torch.optim.Adam(gen.parameters(), lr=lr, capturable=True)
+    disc_opt = torch.optim.Adam(disc.parameters(), lr=lr, capturable=True)
     
     generator_loss = 0
     discriminator_loss = 0
@@ -298,6 +327,10 @@ if __name__ == "__main__":
         start_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
     
+    trainer = Trainer()
+    stream = torch.cuda.Stream()
+    stream.wait_stream(torch.cuda.current_stream())
+
     for epoch in range(n_epochs):
         # Dataloader returns the batches
         if torch.cuda.is_available():
@@ -309,8 +342,15 @@ if __name__ == "__main__":
             cur_batch_size = len(real[0])
             real_ = real[0].to(device)
     
-            # Run the training step
-            disc_loss, gen_loss = train_step(real_, cur_batch_size, z_dim, device, gen, disc, criterion, gen_opt, disc_opt)
+            if (epoch == 0 and i < 3):
+                # Run the training step
+                disc_loss, gen_loss = trainer.train_step(real_, cur_batch_size, z_dim, device, gen, disc, criterion, gen_opt, disc_opt, stream, False)
+            else:
+                if trainer.g is None:
+                    torch.cuda.current_stream().wait_stream(stream)
+                    trainer.train_step(real_, cur_batch_size, z_dim, device, gen, disc, criterion, gen_opt, disc_opt, stream, True)
+                trainer.replay(real_)
+
     
             # Track loss
             generator_loss += gen_loss.item()
