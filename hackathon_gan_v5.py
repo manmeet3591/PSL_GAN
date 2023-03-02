@@ -51,6 +51,7 @@ def parse_arguments():
     return args
 
 df = pd.read_csv('data/Monthly_Average_1950_2009_reservoir.csv')
+#df = pd.read_csv('data/daily_data_1950_2009_reservoir.csv')
 
 # GRADED FUNCTION: get_generator_block
 def get_generator_block(input_dim, output_dim):
@@ -248,9 +249,20 @@ if __name__ == "__main__":
     display_step = 25
     lr = 0.00001
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    #device = 'cpu'
     
     gen = Generator(z_dim=z_dim, hidden_dim=args.gen_hidden_dim).to(device)
     disc = Discriminator(hidden_dim=args.disc_hidden_dim).to(device) 
+
+    # git script
+    gen = torch.jit.script(gen)
+    disc = torch.jit.script(disc)
+
+    # git trace
+    #fake_noise = get_noise(batch_size, z_dim, device=device)
+    #disc = torch.jit.trace(disc, gen(fake_noise))
+    #gen = torch.jit.trace(gen, fake_noise) 
+
     gen_opt = torch.optim.Adam(gen.parameters(), lr=lr)
     disc_opt = torch.optim.Adam(disc.parameters(), lr=lr)
     
@@ -275,6 +287,7 @@ if __name__ == "__main__":
         #for real in tqdm(dataloader):
         for i, real in enumerate(dataloader):
             cur_batch_size = len(real[0])
+            #print(cur_batch_size)
             real_ = real[0].to(device)
             # Flatten the batch of real images from the dataset
             #real = real.view(cur_batch_size, -1).to(device)
