@@ -9,14 +9,48 @@ from torch.utils.data import TensorDataset, DataLoader
 from tqdm.auto import tqdm
 torch.manual_seed(0) # Set for testing purposes, please do not change!
 
-df = pd.read_csv('data/Monthly_Average_1950_2009_reservoir.csv')
+def parse_arguments():    
+    import argparse    
+         
+    parser = argparse.ArgumentParser()    
+    parser.add_argument(    
+        "--visualize", action="store_true", help="visualize results at the end of training"    
+    )    
+    parser.add_argument(    
+        "--profile", action="store_true", help="profile with nsight systems"    
+    )    
+    parser.add_argument(    
+        "--profile-start-iter",    
+        type=int,    
+        default=50,    
+        help="start iteration for nsys profile",    
+    )    
+    parser.add_argument(    
+        "--profile-end-iter",    
+        type=int,    
+        default=70,    
+        help="end iteration for nsys profile",    
+    )    
+    parser.add_argument(    
+        "--gen-hidden-dim", type=int, default=8, help="hidden dimension of generator layers"    
+    )    
+    parser.add_argument(    
+        "--disc-hidden-dim", type=int, default=8, help="hidden dimension of discriminator layers"    
+    )    
+    parser.add_argument(    
+        "--max-epochs", type=int, default=1000, help="number of training epochs"    
+    )    
+    parser.add_argument(    
+        "--batch-size", type=int, default=256, help="Batch size"    
+    )    
+    parser.add_argument(    
+        "--noise-dim", type=int, default=2, help="Dimensionality of noise vector"    
+    )    
+    args = parser.parse_args()    
+    print(f"Parameters: {args}")    
+    return args
 
-tensor_x = torch.Tensor(df.values) # transform to torch tensor
-batch_size = 64
-dataset = TensorDataset(tensor_x) # create your datset
-dataloader = DataLoader(dataset,
-    batch_size=batch_size,
-    shuffle=True) # create your dataloader
+df = pd.read_csv('data/Monthly_Average_1950_2009_reservoir.csv')
 
 # GRADED FUNCTION: get_generator_block
 def get_generator_block(input_dim, output_dim):
@@ -196,168 +230,186 @@ def get_gen_loss(fake, disc, criterion):
     gen_loss = criterion(disc_fake_pred, torch.ones_like(disc_fake_pred))
     return gen_loss
 
-# Set your parameters
-criterion = nn.BCEWithLogitsLoss()
-n_epochs = 2
-z_dim = 2
-display_step = 25
-lr = 0.00001
-device = 'cuda'
+if __name__ == "__main__":
+    # Get command line arguments
+    args = parse_arguments()
+    batch_size = args.batch_size
+    n_epochs = args.max_epochs
+    z_dim = args.noise_dim
 
-gen = Generator(z_dim).to(device)
-disc = Discriminator().to(device) 
-gen_opt = torch.optim.Adam(gen.parameters(), lr=lr)
-disc_opt = torch.optim.Adam(disc.parameters(), lr=lr)
-
-generator_loss = 0
-discriminator_loss = 0
-test_generator = True # Whether the generator should be tested
-gen_loss = False
-error = False
-history = []
-
-start_event = torch.cuda.Event(enable_timing=True)
-end_event = torch.cuda.Event(enable_timing=True)
-
-for epoch in range(n_epochs):
-    fake__ = []
-    real__ = []
-    # Dataloader returns the batches
-    start_event.record()
-    #for real in tqdm(dataloader):
-    for i, real in enumerate(dataloader):
-        cur_batch_size = len(real[0])
-        real_ = real[0].to(device)
-        # Flatten the batch of real images from the dataset
-        #real = real.view(cur_batch_size, -1).to(device)
-
-        fake_noise = get_noise(cur_batch_size, z_dim, device=device)
-        fake = gen(fake_noise)
-
-        ### Update discriminator ###
-        # Zero out the gradients before backpropagation
-        disc_opt.zero_grad()
-
-        # Calculate discriminator loss
-        #disc_loss = get_disc_loss(gen, disc, criterion, real_, cur_batch_size, z_dim, device)
-        disc_loss = get_disc_loss(fake, disc, criterion, real_)
-
-        # Update gradients
-        disc_loss.backward(retain_graph=True)
-
-        # Update optimizer
-        disc_opt.step()
-
-        # For testing purposes, to keep track of the generator weights
-        if test_generator:
-            old_generator_weights = gen.gen[0][0].weight.detach().clone()
-
-        ### Update generator ###
-        gen_opt.zero_grad()
-        #gen_loss = get_gen_loss(gen, disc, criterion, cur_batch_size, z_dim, device)
-        gen_loss = get_gen_loss(fake, disc, criterion)
-        gen_loss.backward()
-        gen_opt.step()
-
-        # For testing purposes, to check that your code changes the generator weights
-        if test_generator:
-            try:
-                assert lr > 0.0000002 or (gen.gen[0][0].weight.grad.abs().max() < 0.0005 and epoch == 0)
-                assert torch.any(gen.gen[0][0].weight.detach().clone() != old_generator_weights)
-            except:
-                error = True
-                print("Runtime tests have failed")
-
-        real__.append(real_.cpu().detach().numpy())
-        fake_noise = get_noise(cur_batch_size, z_dim, device=device)
-        fake__.append(gen(fake_noise).cpu().detach().numpy())
-
-        # Track loss
-        generator_loss += gen_loss.item()
-        discriminator_loss += disc_loss.item()
-
-    generator_loss /= len(dataloader)
-    discriminator_loss /= len(dataloader)
-
-    ### Visualization code ###
-    if epoch % display_step == 0:
-        print(f"epoch {epoch}: Generator loss: {generator_loss}, discriminator loss: {discriminator_loss}")
-
-    ### History ###
-    history.append({'gen_loss': generator_loss, 'disc_loss': discriminator_loss})
-
-    end_event.record()
-
-    end_event.synchronize()
-    elapsed_time = start_event.elapsed_time(end_event)  # in milliseconds
-    print(f'Epoch {epoch}, time = {elapsed_time} ms')
-
-history = pd.DataFrame(history)
-
-# Evaluate the model
-fake_noise = get_noise(720, z_dim, device=device)
-fake = gen(fake_noise).cpu().detach().numpy()
-#np.savetxt('fake.txt', fake, delimiter=',')
-
-#real = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
-real = df.values
-
-# mean error (%)
-mean_error = (fake.mean(axis=0) - real.mean(axis=0)) / real.mean(axis=0) * 100
-
-# std error (%)
-std_error = (fake.std(axis=0) - real.std(axis=0)) / real.std(axis=0) * 100
-
-# Combine
-stats_df = pd.DataFrame([mean_error, std_error],
-                        columns=df.columns,
-                        index=['Mean error', 'Std error'])
-
-# Mean absolute percent error
-mape_df = stats_df.abs().mean(axis=1)
-
-with pd.option_context('display.float_format', '{:.2f}%'.format, 'display.expand_frame_repr', False):
-    print('---Individual watersheds---')
-    print(stats_df)
-    print('---Summary (MAPE)---')
-    print(mape_df)
-
-# Calculate empirical CDFs
-bins = np.linspace(0, 15, 31)   # Maximum 15 mm for now
-binsize = bins[1:] - bins[:-1]
-
-real_hist = np.apply_along_axis(lambda a: np.histogram(a, bins=bins, density=True)[0], 0, real)
-real_ecdf = np.cumsum(real_hist, axis=0) * binsize[:, np.newaxis]
-
-fake_hist = np.apply_along_axis(lambda a: np.histogram(a, bins=bins, density=True)[0], 0, fake)
-fake_ecdf = np.cumsum(fake_hist, axis=0) * binsize[:, np.newaxis]
-
-# Continuous ranked probability score (CRPS)
-crps = np.sum(np.abs((real_ecdf - fake_ecdf) * binsize[:, np.newaxis]), axis=0)
-crps_df = pd.DataFrame([crps], columns=df.columns, index=['CRPS'])
-
-with pd.option_context('display.float_format', '{:.2f}'.format, 'display.expand_frame_repr', False):
-    print('---Individual watersheds---')
-    print(crps_df)
-    print('---Mean CRPS---')
-    print(f'{crps.mean():.2f}')
-
-
-## Make plots
-#import seaborn as sns
-#import matplotlib.pyplot as plt 
-#
-#dict_ = {'data':real[:,0], 'type':'real', 'station': '1'}
-#df = pd.DataFrame(dict_)
-#for i in range(2,7):
-#    dict_ = {'data':real[:,i-1], 'type':'real', 'station': str(i)}
-#    df = df.append(pd.DataFrame(dict_))
-#
-#for i in range(1,7):
-#    dict_ = {'data':fake[:,i-1], 'type':'fake', 'station': str(i)}
-#    df = df.append(pd.DataFrame(dict_))
-#
-#sns.boxplot(data=df, x="station", y="data", hue="type")
-#plt.savefig('boxplot.png', dpi=500)
-#sns.violinplot(data=df, x="station", y="data", hue="type")
-#plt.savefig('violinplot.png', dpi=500)
+    tensor_x = torch.Tensor(df.values) # transform to torch tensor
+    dataset = TensorDataset(tensor_x) # create your datset
+    dataloader = DataLoader(dataset,
+        batch_size=batch_size,
+        shuffle=True) # create your dataloader
+    
+    # Set your parameters
+    criterion = nn.BCEWithLogitsLoss()
+    display_step = 25
+    lr = 0.00001
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    
+    gen = Generator(z_dim=z_dim, hidden_dim=args.gen_hidden_dim).to(device)
+    disc = Discriminator(hidden_dim=args.disc_hidden_dim).to(device) 
+    gen_opt = torch.optim.Adam(gen.parameters(), lr=lr)
+    disc_opt = torch.optim.Adam(disc.parameters(), lr=lr)
+    
+    generator_loss = 0
+    discriminator_loss = 0
+    test_generator = False # Whether the generator should be tested
+    error = False
+    history = []
+    
+    if torch.cuda.is_available():
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+    
+    for epoch in range(n_epochs):
+        fake__ = []
+        real__ = []
+        # Dataloader returns the batches
+        if torch.cuda.is_available():
+            start_event.record()
+        else:
+            start_time = time.time()
+        #for real in tqdm(dataloader):
+        for i, real in enumerate(dataloader):
+            cur_batch_size = len(real[0])
+            real_ = real[0].to(device)
+            # Flatten the batch of real images from the dataset
+            #real = real.view(cur_batch_size, -1).to(device)
+    
+            fake_noise = get_noise(cur_batch_size, z_dim, device=device)
+            fake = gen(fake_noise)
+    
+            ### Update discriminator ###
+            # Zero out the gradients before backpropagation
+            disc_opt.zero_grad()
+    
+            # Calculate discriminator loss
+            #disc_loss = get_disc_loss(gen, disc, criterion, real_, cur_batch_size, z_dim, device)
+            disc_loss = get_disc_loss(fake, disc, criterion, real_)
+    
+            # Update gradients
+            disc_loss.backward(retain_graph=True)
+    
+            # Update optimizer
+            disc_opt.step()
+    
+            # For testing purposes, to keep track of the generator weights
+            if test_generator:
+                old_generator_weights = gen.gen[0][0].weight.detach().clone()
+    
+            ### Update generator ###
+            gen_opt.zero_grad()
+            #gen_loss = get_gen_loss(gen, disc, criterion, cur_batch_size, z_dim, device)
+            gen_loss = get_gen_loss(fake, disc, criterion)
+            gen_loss.backward()
+            gen_opt.step()
+    
+            # For testing purposes, to check that your code changes the generator weights
+            if test_generator:
+                try:
+                    assert lr > 0.0000002 or (gen.gen[0][0].weight.grad.abs().max() < 0.0005 and epoch == 0)
+                    assert torch.any(gen.gen[0][0].weight.detach().clone() != old_generator_weights)
+                except:
+                    error = True
+                    print("Runtime tests have failed")
+    
+            real__.append(real_.cpu().detach().numpy())
+            fake_noise = get_noise(cur_batch_size, z_dim, device=device)
+            fake__.append(gen(fake_noise).cpu().detach().numpy())
+    
+            # Track loss
+            generator_loss += gen_loss.item()
+            discriminator_loss += disc_loss.item()
+    
+        generator_loss /= len(dataloader)
+        discriminator_loss /= len(dataloader)
+    
+        ### Visualization code ###
+        if epoch % display_step == 0:
+            print(f"epoch {epoch}: Generator loss: {generator_loss}, discriminator loss: {discriminator_loss}")
+    
+        ### History ###
+        history.append({'gen_loss': generator_loss, 'disc_loss': discriminator_loss})
+    
+        if torch.cuda.is_available():
+       	    end_event.record()
+            end_event.synchronize()
+            elapsed_time = start_event.elapsed_time(end_event)  # in milliseconds
+        else:
+            elapsed_time = (time.time() - start_time)*1000
+    
+        print(f'Epoch {epoch}, time = {elapsed_time} ms')
+    
+    history = pd.DataFrame(history)
+    
+    # Evaluate the model
+    fake_noise = get_noise(720, z_dim, device=device)
+    fake = gen(fake_noise).cpu().detach().numpy()
+    #np.savetxt('fake.txt', fake, delimiter=',')
+    
+    #real = pd.read_csv('../data/Monthly_Average_1950_2009_reservoir.csv').values
+    real = df.values
+    
+    # mean error (%)
+    mean_error = (fake.mean(axis=0) - real.mean(axis=0)) / real.mean(axis=0) * 100
+    
+    # std error (%)
+    std_error = (fake.std(axis=0) - real.std(axis=0)) / real.std(axis=0) * 100
+    
+    # Combine
+    stats_df = pd.DataFrame([mean_error, std_error],
+                            columns=df.columns,
+                            index=['Mean error', 'Std error'])
+    
+    # Mean absolute percent error
+    mape_df = stats_df.abs().mean(axis=1)
+    
+    with pd.option_context('display.float_format', '{:.2f}%'.format, 'display.expand_frame_repr', False):
+        print('---Individual watersheds---')
+        print(stats_df)
+        print('---Summary (MAPE)---')
+        print(mape_df)
+    
+    # Calculate empirical CDFs
+    bins = np.linspace(0, 15, 31)   # Maximum 15 mm for now
+    binsize = bins[1:] - bins[:-1]
+    
+    real_hist = np.apply_along_axis(lambda a: np.histogram(a, bins=bins, density=True)[0], 0, real)
+    real_ecdf = np.cumsum(real_hist, axis=0) * binsize[:, np.newaxis]
+    
+    fake_hist = np.apply_along_axis(lambda a: np.histogram(a, bins=bins, density=True)[0], 0, fake)
+    fake_ecdf = np.cumsum(fake_hist, axis=0) * binsize[:, np.newaxis]
+    
+    # Continuous ranked probability score (CRPS)
+    crps = np.sum(np.abs((real_ecdf - fake_ecdf) * binsize[:, np.newaxis]), axis=0)
+    crps_df = pd.DataFrame([crps], columns=df.columns, index=['CRPS'])
+    
+    with pd.option_context('display.float_format', '{:.2f}'.format, 'display.expand_frame_repr', False):
+        print('---Individual watersheds---')
+        print(crps_df)
+        print('---Mean CRPS---')
+        print(f'{crps.mean():.2f}')
+    
+    
+    if args.visualize:
+        # Make plots
+        import seaborn as sns
+        import matplotlib.pyplot as plt 
+        
+        dict_ = {'data':real[:,0], 'type':'real', 'station': '1'}
+        df = pd.DataFrame(dict_)
+        for i in range(2,7):
+            dict_ = {'data':real[:,i-1], 'type':'real', 'station': str(i)}
+            df = df.append(pd.DataFrame(dict_))
+        
+        for i in range(1,7):
+            dict_ = {'data':fake[:,i-1], 'type':'fake', 'station': str(i)}
+            df = df.append(pd.DataFrame(dict_))
+        
+        sns.boxplot(data=df, x="station", y="data", hue="type")
+        plt.savefig('boxplot.png', dpi=500)
+        sns.violinplot(data=df, x="station", y="data", hue="type")
+        plt.savefig('violinplot.png', dpi=500)
