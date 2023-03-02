@@ -50,8 +50,8 @@ def parse_arguments():
     print(f"Parameters: {args}")    
     return args
 
-df = pd.read_csv('data/Monthly_Average_1950_2009_reservoir.csv')
-#df = pd.read_csv('data/daily_data_1950_2009_reservoir.csv')
+#df = pd.read_csv('data/Monthly_Average_1950_2009_reservoir.csv')
+df = pd.read_csv('data/daily_data_1950_2009_reservoir.csv', usecols=range(3, 9))
 
 # GRADED FUNCTION: get_generator_block
 def get_generator_block(input_dim, output_dim):
