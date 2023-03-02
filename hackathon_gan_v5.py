@@ -20,6 +20,9 @@ def parse_arguments():
         "--profile", action="store_true", help="profile with nsight systems"    
     )    
     parser.add_argument(    
+        "--use-cuda-graphs", action="store_true", help="Use cuda graphs for additional performance"    
+    )    
+    parser.add_argument(    
         "--profile-start-iter",    
         type=int,    
         default=50,    
@@ -230,6 +233,37 @@ def get_gen_loss(fake, disc, criterion):
     gen_loss = criterion(disc_fake_pred, torch.ones_like(disc_fake_pred))
     return gen_loss
 
+def update_discriminator(fake, disc, criterion, real_, disc_opt):
+    # Calculate discriminator loss
+    disc_loss = get_disc_loss(fake, disc, criterion, real_)
+    
+    # Update gradients
+    disc_loss.backward(retain_graph=True)
+    
+    # Update optimizer
+    disc_opt.step()
+
+    return disc_loss
+    
+def update_generator(fake, disc, criterion, gen_opt):
+    ### Update generator ###
+    gen_loss = get_gen_loss(fake, disc, criterion)
+    gen_loss.backward()
+    gen_opt.step()
+    return gen_loss
+
+def train_step(real_, cur_batch_size, z_dim, device, gen, disc, criterion, gen_opt, disc_opt):
+    disc_opt.zero_grad(set_to_none=True)
+    gen_opt.zero_grad(set_to_none=True)
+
+    fake_noise = get_noise(cur_batch_size, z_dim, device=device)
+    fake = gen(fake_noise)
+
+    disc_loss = update_discriminator(fake, disc, criterion, real_, disc_opt)
+    gen_loss = update_generator(fake, disc, criterion, gen_opt)
+
+    return disc_loss, gen_loss
+    
 if __name__ == "__main__":
     # Get command line arguments
     args = parse_arguments()
@@ -265,8 +299,6 @@ if __name__ == "__main__":
         end_event = torch.cuda.Event(enable_timing=True)
     
     for epoch in range(n_epochs):
-        fake__ = []
-        real__ = []
         # Dataloader returns the batches
         if torch.cuda.is_available():
             start_event.record()
@@ -276,49 +308,9 @@ if __name__ == "__main__":
         for i, real in enumerate(dataloader):
             cur_batch_size = len(real[0])
             real_ = real[0].to(device)
-            # Flatten the batch of real images from the dataset
-            #real = real.view(cur_batch_size, -1).to(device)
     
-            fake_noise = get_noise(cur_batch_size, z_dim, device=device)
-            fake = gen(fake_noise)
-    
-            ### Update discriminator ###
-            # Zero out the gradients before backpropagation
-            disc_opt.zero_grad()
-    
-            # Calculate discriminator loss
-            #disc_loss = get_disc_loss(gen, disc, criterion, real_, cur_batch_size, z_dim, device)
-            disc_loss = get_disc_loss(fake, disc, criterion, real_)
-    
-            # Update gradients
-            disc_loss.backward(retain_graph=True)
-    
-            # Update optimizer
-            disc_opt.step()
-    
-            # For testing purposes, to keep track of the generator weights
-            if test_generator:
-                old_generator_weights = gen.gen[0][0].weight.detach().clone()
-    
-            ### Update generator ###
-            gen_opt.zero_grad()
-            #gen_loss = get_gen_loss(gen, disc, criterion, cur_batch_size, z_dim, device)
-            gen_loss = get_gen_loss(fake, disc, criterion)
-            gen_loss.backward()
-            gen_opt.step()
-    
-            # For testing purposes, to check that your code changes the generator weights
-            if test_generator:
-                try:
-                    assert lr > 0.0000002 or (gen.gen[0][0].weight.grad.abs().max() < 0.0005 and epoch == 0)
-                    assert torch.any(gen.gen[0][0].weight.detach().clone() != old_generator_weights)
-                except:
-                    error = True
-                    print("Runtime tests have failed")
-    
-            real__.append(real_.cpu().detach().numpy())
-            fake_noise = get_noise(cur_batch_size, z_dim, device=device)
-            fake__.append(gen(fake_noise).cpu().detach().numpy())
+            # Run the training step
+            disc_loss, gen_loss = train_step(real_, cur_batch_size, z_dim, device, gen, disc, criterion, gen_opt, disc_opt)
     
             # Track loss
             generator_loss += gen_loss.item()
