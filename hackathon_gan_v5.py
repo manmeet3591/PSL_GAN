@@ -18,13 +18,12 @@ torch.manual_seed(0) # Set for testing purposes, please do not change!
 # Load the Drive helper and mount
 #from google.colab import drive
 #drive.mount('/content/drive')
-
 #!ls /content/drive/MyDrive/hackathon
 
 df = pd.read_csv('data/Monthly_Average_1950_2009_reservoir.csv')
 
 tensor_x = torch.Tensor(df.values) # transform to torch tensor
-batch_size = 32
+batch_size = 64
 dataset = TensorDataset(tensor_x) # create your datset
 dataloader = DataLoader(dataset,
     batch_size=batch_size,
@@ -67,7 +66,7 @@ class Generator(nn.Module):
             get_generator_block(hidden_dim * 2, hidden_dim * 4),
             get_generator_block(hidden_dim * 4, hidden_dim * 8),
             nn.Linear(hidden_dim * 8, im_dim),
-            #nn.Sigmoid()
+            nn.ReLU(),
         )
     def forward(self, noise):
         '''
@@ -151,7 +150,8 @@ class Discriminator(nn.Module):
         return self.disc
 
 
-def get_disc_loss(gen, disc, criterion, real, num_images, z_dim, device):
+#def get_disc_loss(gen, disc, criterion, real, num_images, z_dim, device):
+def get_disc_loss(fake, disc, criterion, real):
     '''
     Return the loss of the discriminator given inputs.
     Parameters:
@@ -180,8 +180,8 @@ def get_disc_loss(gen, disc, criterion, real, num_images, z_dim, device):
     #       4) Calculate the discriminator's loss by averaging the real and fake loss
     #            and set it to disc_loss.
     #     *Important*: You should NOT write your own loss function here - use criterion(pred, true)!
-    fake_noise = get_noise(num_images, z_dim, device=device)
-    fake = gen(fake_noise)
+    #fake_noise = get_noise(num_images, z_dim, device=device)
+    #fake = gen(fake_noise)
     disc_fake_pred = disc(fake.detach())
     disc_fake_loss = criterion(disc_fake_pred, torch.zeros_like(disc_fake_pred))
     disc_real_pred = disc(real)
@@ -189,7 +189,8 @@ def get_disc_loss(gen, disc, criterion, real, num_images, z_dim, device):
     disc_loss = (disc_fake_loss + disc_real_loss) / 2
     return disc_loss
 
-def get_gen_loss(gen, disc, criterion, num_images, z_dim, device):
+#def get_gen_loss(gen, disc, criterion, num_images, z_dim, device):
+def get_gen_loss(fake, disc, criterion):
     '''
     Return the loss of the generator given inputs.
     Parameters:
@@ -213,15 +214,15 @@ def get_gen_loss(gen, disc, criterion, num_images, z_dim, device):
     #          the discriminator to think that its fake images are real
     #     *Important*: You should NOT write your own loss function here - use criterion(pred, true)!
 
-    fake_noise = get_noise(num_images, z_dim, device=device)
-    fake = gen(fake_noise)
+    #fake_noise = get_noise(num_images, z_dim, device=device)
+    #fake = gen(fake_noise)
     disc_fake_pred = disc(fake)
     gen_loss = criterion(disc_fake_pred, torch.ones_like(disc_fake_pred))
     return gen_loss
 
 # Set your parameters
 criterion = nn.BCEWithLogitsLoss()
-n_epochs = 200
+n_epochs = 2
 z_dim = 2
 display_step = 500
 lr = 0.00001
@@ -238,22 +239,32 @@ mean_discriminator_loss = 0
 test_generator = True # Whether the generator should be tested
 gen_loss = False
 error = False
+
+start_event = torch.cuda.Event(enable_timing=True)
+end_event = torch.cuda.Event(enable_timing=True)
+
 for epoch in range(n_epochs):
     fake__ = []
     real__ = []
     # Dataloader returns the batches
-    for real in tqdm(dataloader):
+    start_event.record()
+    #for real in tqdm(dataloader):
+    for i, real in enumerate(dataloader):
         cur_batch_size = len(real[0])
         real_ = real[0].to(device)
         # Flatten the batch of real images from the dataset
         #real = real.view(cur_batch_size, -1).to(device)
+
+        fake_noise = get_noise(cur_batch_size, z_dim, device=device)
+        fake = gen(fake_noise)
 
         ### Update discriminator ###
         # Zero out the gradients before backpropagation
         disc_opt.zero_grad()
 
         # Calculate discriminator loss
-        disc_loss = get_disc_loss(gen, disc, criterion, real_, cur_batch_size, z_dim, device)
+        #disc_loss = get_disc_loss(gen, disc, criterion, real_, cur_batch_size, z_dim, device)
+        disc_loss = get_disc_loss(fake, disc, criterion, real_)
 
         # Update gradients
         disc_loss.backward(retain_graph=True)
@@ -272,7 +283,8 @@ for epoch in range(n_epochs):
         #       2) Calculate the generator loss, assigning it to gen_loss.
         #       3) Backprop through the generator: update the gradients and optimizer.
         gen_opt.zero_grad()
-        gen_loss = get_gen_loss(gen, disc, criterion, cur_batch_size, z_dim, device)
+        #gen_loss = get_gen_loss(gen, disc, criterion, cur_batch_size, z_dim, device)
+        gen_loss = get_gen_loss(fake, disc, criterion)
         gen_loss.backward()
         gen_opt.step()
 
@@ -303,6 +315,11 @@ for epoch in range(n_epochs):
             mean_generator_loss = 0
             mean_discriminator_loss = 0
         cur_step += 1
+    end_event.record()
+
+    end_event.synchronize()
+    elapsed_time = start_event.elapsed_time(end_event)  # in milliseconds
+    print(f'Epoch {epoch}, time = {elapsed_time} ms')
 
 # Evaluate the model
 fake_noise = get_noise(720, z_dim, device=device)
